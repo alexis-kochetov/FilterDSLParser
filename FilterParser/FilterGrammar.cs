@@ -1,4 +1,7 @@
 ﻿using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Linq.Expressions;
 using Sprache;
 
 namespace FilterParser
@@ -80,26 +83,62 @@ namespace FilterParser
                 from item in NodeItem.Or(EscapedNodeItem)
                 select dot + item
             ).XMany()
-            select firstNode + string.Join(string.Empty, theRest)).Token();
+            select firstNode + string.Join(string.Empty, theRest)).Token().Named("node");
 
         public static Parser<BinaryElement> BinaryParser = 
             from node in Node
-            from op in GreaterThan.Or(LessThan).Or(LessThanOrEquals).Or(EqualsOp).Or(GreaterThanOrEquals)
-            from val in String.Select(s => (object)s).Or(Bool.Select(b => (object)b)).Or(Decimal.Select(d => (object)d))
+            from op in GreaterThanOrEquals.XOr(LessThanOrEquals).XOr(EqualsOp).XOr(LessThan).XOr(GreaterThan)
+            from val in String.Select(s => (object)s).XOr(Bool.Select(b => (object)b)).XOr(Decimal.Select(d => (object)d))
             select new BinaryElement(new NodeElement(node), op, val);
 
-//        public static Parser<Element> ElementParser = 
+       
+
+//        static readonly Parser<Expression> Factor =
+//            (from lparen in Parse.Char('(')
+//                from expr in Parse.Ref(() => Expr)
+//                from rparen in Parse.Char(')')
+//                select expr).Named("expression")
+//            .XOr(Constant);
+//
+//        static readonly Parser<Expression> Operand =
+//        ((from sign in Parse.Char('-')
+//            from factor in Factor
+//            select Expression.Negate(factor)
+//        ).XOr(Factor)).Token();
+//
+//        static readonly Parser<Expression> Term = Parse.XChainOperator(Multiply.XOr(Divide), Operand, Expression.MakeBinary);
+//
+//        static readonly Parser<Expression> Expr = Parse.XChainOperator(Add.XOr(Subtract), Term, Expression.MakeBinary);
+
+        //        public static Parser<Element> ElementParser = 
 
 
-        public static Parser<LogicalOperator> And = Parse.String("AND").Token().Select(_ => LogicalOperator.And);
-        public static Parser<LogicalOperator> Or = Parse.String("OR").Token().Select(_ => LogicalOperator.Or);
+        public static Parser<LogicalOperator> And = Parse.String("AND").Token().Return(LogicalOperator.And);
+        public static Parser<LogicalOperator> Or = Parse.String("OR").Token().Return(LogicalOperator.Or);
 
-        public static Parser<Operator> GreaterThan = Parse.Char('>').Token().Select(_ => Operator.GreaterThan);
-        public static Parser<Operator> LessThan = Parse.Char('<').Token().Select(_ => Operator.LessThan);
-        public static Parser<Operator> EqualsOp = Parse.Char('=').Token().Select(_ => Operator.Equals);
-        public static Parser<Operator> GreaterThanOrEquals = Parse.String(">=").Token().Select(_ => Operator.GreaterThanOrEquals);
-        public static Parser<Operator> LessThanOrEquals = Parse.String("<=").Token().Select(_ => Operator.LessThanOrEquals);
-        
+        public static Parser<Operator> GreaterThanOrEquals = Parse.String(">=").Token().Return(Operator.GreaterThanOrEquals);
+        public static Parser<Operator> LessThanOrEquals = Parse.String("<=").Token().Return(Operator.LessThanOrEquals);
+        public static Parser<Operator> EqualsOp = Parse.Char('=').Token().Return(Operator.Equals);
+        public static Parser<Operator> GreaterThan = Parse.Char('>').Token().Return(Operator.GreaterThan);
+        public static Parser<Operator> LessThan = Parse.Char('<').Token().Return(Operator.LessThan);
+
+        public static Parser<LogicalGroup> OrGroup = GroupParser(Or);
+        public static Parser<LogicalGroup> AndGroup = GroupParser(And);
+
+        private static Parser<LogicalGroup> GroupParser(Parser<LogicalOperator> op)
+        {
+            return
+                from first in BinaryParser
+                from p in op
+                from second in BinaryParser
+                from theRest in (
+                    from pN in op
+                    from n in BinaryParser
+                    select n
+                ).Many()
+                select new LogicalGroup(p, new[] { first, second }.Concat(theRest).ToList());
+        }
+
         public static Parser<string> String = 
            (from qStart in Parse.Char('"')
             from str in Parse.CharExcept("\"\r\n").XMany().Text()
@@ -108,7 +147,7 @@ namespace FilterParser
 
         public static Parser<bool> Bool = Parse.IgnoreCase("true").Or(Parse.IgnoreCase("false")).Text().Select(x => x.ToLower() == "true");
 
-        public static Parser<decimal> Decimal = Parse.Decimal.Select(decimal.Parse);
+        public static Parser<decimal> Decimal = Parse.DecimalInvariant.Select(s => decimal.Parse(s.Replace(',','.'), NumberStyles.Any, NumberFormatInfo.InvariantInfo));
 
 
     }
