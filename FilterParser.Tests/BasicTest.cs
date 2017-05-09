@@ -59,12 +59,32 @@ namespace FilterParser.Tests
         }
 
         [Fact]
+        public void ManyArgsFunctionTest()
+        {
+            var node = FilterGrammar.FunctionItem.Parse("SimpleFun(\"arg1\", true, 123)");
+
+            Assert.Equal("SimpleFun", node.Name);
+            Assert.Equal(3, node.Arguments.Count);
+            Assert.Equal("arg1", node.Arguments[0].StringValue);
+            Assert.Equal(true, node.Arguments[1].BoolValue);
+            Assert.Equal(123m, node.Arguments[2].DecimalValue);
+        }
+
+        [Fact]
         public void EmptyFunctionTest()
         {
             var node = FilterGrammar.FunctionItem.Parse("SimpleFun()");
 
             Assert.Equal("SimpleFun", node.Name);
             Assert.Equal(0, node.Arguments.Count);
+        }
+
+        [Fact]
+        public void WrongFunctionTest()
+        {
+            var result = FilterGrammar.FunctionItem.TryParse("()");
+
+            Assert.False(result.WasSuccessful);
         }
 
         [Fact]
@@ -130,6 +150,29 @@ Aasd.ASDDD098.[asedsdf sdfsd 0909] = 123");
         AsaA >= 1234.4 
         OR  Xyz = true 
     )  
+)  
+");
+
+            Assert.Equal(FilterGrammar.LogicalOperator.And, group.LogicalOperator);
+        }
+
+        [Fact]
+        public void FilterWithFunctionTest()
+        {
+            var group = FilterGrammar.Filter.Parse(@"
+    
+(
+    Aasd.ASDDD098 = ""asa asa"" 
+    AND 
+    (
+        AsaA >= 1234.4 
+        OR  Xyz = true 
+    ) 
+    AND 
+    (
+        Func(true) = false
+        OR FunctionR(""arg1"") = true
+    )
 )  
 ");
 

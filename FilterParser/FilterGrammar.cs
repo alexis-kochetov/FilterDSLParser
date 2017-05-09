@@ -117,26 +117,22 @@ namespace FilterParser
 
         public static Parser<string> EscapedNodeItem =
             from lBracket in Parse.Char('[')
-            from firstLetter in Parse.LetterOrDigit.XAtLeastOnce().Text()
+            from first in Parse.LetterOrDigit.XAtLeastOnce().Text()
             from theRest in Parse.CharExcept("{}\r\n[]").XMany().Text()
             from rBracket in Parse.Char(']')
-            select firstLetter + theRest;
+            select first + theRest;
 
         public static Parser<FunctionElement> FunctionItem =
-           (from name in Parse.Letter.XMany().Text()
+           (from name in Parse.Letter.XAtLeastOnce().Text()
             from lParen in Parse.Char('(')
             from args in ValParser.DelimitedBy(Parse.Char(',').Token()).Optional()
             from rParen in Parse.Char(')')
             select new FunctionElement(name, args.IsDefined ? args.Get().ToList() : new List<Val>())).Token().Named("function");
 
-        public static Parser<string> Node =
-           (from firstNode in NodeItem
-            from theRest in (
-                from dot in Parse.Char('.')
-                from item in NodeItem.Or(EscapedNodeItem)
-                select dot + item
-            ).XMany()
-            select firstNode + string.Join(string.Empty, theRest)).Token().Named("node");
+        public static Parser<string> Node = NodeItem.Or(EscapedNodeItem).XDelimitedBy(Parse.Char('.'))
+            .Select(items => string.Join(".", items))
+            .Token()
+            .Named("node");
 
         public static Parser<LogicalOperator> And = Parse.String("AND").Token().Return(LogicalOperator.And);
         public static Parser<LogicalOperator> Or = Parse.String("OR").Token().Return(LogicalOperator.Or);
@@ -163,7 +159,7 @@ namespace FilterParser
                 .XOr(Decimal.Select(d => new Val(d))));
 
         public static Parser<BinaryElement> BinaryParser = 
-           (from node in Node.Select(n => new NodeElement(n))//.Or(FunctionItem)
+           (from node in FunctionItem.Or(Node.Select(n => new NodeElement(n)))
             from op in GreaterThanOrEquals.XOr(LessThanOrEquals).XOr(EqualsOp).XOr(LessThan).XOr(GreaterThan)
             from val in ValParser
             select new BinaryElement(node, op, val)).Named("binary");
@@ -202,10 +198,5 @@ namespace FilterParser
                 ).Many()
                 select new LogicalGroup(p, new[] { first, second }.Concat(theRest).ToList());
         }
-
-        //        private static Parser
-
-        
-
     }
 }
