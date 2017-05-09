@@ -23,6 +23,42 @@ namespace FilterParser
             LessThanOrEquals
         }
 
+        public enum ValType
+        {
+            String,
+            Bool,
+            Decimal
+        }
+
+        public class Val
+        {
+            private readonly object _value;
+
+            public Val(string stringValue)
+            {
+                _value = stringValue;
+                Type = ValType.String;
+            }
+
+            public Val(bool boolValue)
+            {
+                _value = boolValue;
+                Type = ValType.Bool;
+            }
+            public Val(decimal decimalValue)
+            {
+                _value = decimalValue;
+                Type = ValType.Decimal;
+            }
+
+            public string StringValue => (string) _value;
+            public bool BoolValue => (bool)_value;
+            public decimal DecimalValue => (decimal)_value;
+
+            public ValType Type { get; }
+
+        }
+
         public abstract class Element
         {
             
@@ -38,9 +74,19 @@ namespace FilterParser
             public string Name { get; }
         }
 
+        public class FunctionElement : NodeElement
+        {
+            public FunctionElement(string name, IReadOnlyList<Val> arguments) : base(name)
+            {
+                Arguments = arguments;
+            }
+
+            public IReadOnlyList<Val> Arguments { get; }
+        }
+
         public class BinaryElement : Element
         {
-            public BinaryElement(NodeElement left, Operator @operator, object value)
+            public BinaryElement(NodeElement left, Operator @operator, Val value)
             {
                 Left = left;
                 Operator = @operator;
@@ -49,7 +95,7 @@ namespace FilterParser
 
             public NodeElement Left { get; }
             public Operator Operator { get; }
-            public object Value { get; }
+            public Val Value { get; }
         }
 
         public class LogicalGroup : Element
@@ -76,6 +122,11 @@ namespace FilterParser
             from rBracket in Parse.Char(']')
             select firstLetter + theRest;
 
+        public static Parser<string> FunctionItem =
+            from firstLetter in Parse.Letter.Many().Text()
+            from theRest in Parse.LetterOrDigit.Many().Text()
+            select firstLetter + theRest;
+
         public static Parser<string> Node =
            (from firstNode in NodeItem
             from theRest in (
@@ -85,15 +136,7 @@ namespace FilterParser
             ).XMany()
             select firstNode + string.Join(string.Empty, theRest)).Token().Named("node");
 
-        public static Parser<BinaryElement> BinaryParser = 
-           (from node in Node
-            from op in GreaterThanOrEquals.XOr(LessThanOrEquals).XOr(EqualsOp).XOr(LessThan).XOr(GreaterThan)
-            from val in String.Select(s => (object)s).XOr(Bool.Select(b => (object)b)).XOr(Decimal.Select(d => (object)d))
-            select new BinaryElement(new NodeElement(node), op, val)).Named("binary");
-
-       
-
-//        static readonly Parser<Expression> Factor =
+        //        static readonly Parser<Expression> Factor =
 //            (from lparen in Parse.Char('(')
 //                from expr in Parse.Ref(() => Expr)
 //                from rparen in Parse.Char(')')
@@ -121,6 +164,27 @@ namespace FilterParser
         public static Parser<Operator> EqualsOp = Parse.Char('=').Token().Return(Operator.Equals);
         public static Parser<Operator> GreaterThan = Parse.Char('>').Token().Return(Operator.GreaterThan);
         public static Parser<Operator> LessThan = Parse.Char('<').Token().Return(Operator.LessThan);
+
+        public static Parser<string> String =
+        (from qStart in Parse.Char('"')
+            from str in Parse.CharExcept("\"\r\n").XMany().Text()
+            from qEnd in Parse.Char('"')
+            select str).Token();
+
+        public static Parser<bool> Bool = Parse.IgnoreCase("true").Or(Parse.IgnoreCase("false")).Text().Select(x => x.ToLower() == "true");
+
+        public static Parser<decimal> Decimal = Parse.DecimalInvariant.Select(s => decimal.Parse(s.Replace(',', '.'), NumberStyles.Any, NumberFormatInfo.InvariantInfo));
+
+        public static Parser<Val> ValParser =
+            String.Select(s => new Val(s))
+                .XOr(Bool.Select(b => new Val(b))
+                .XOr(Decimal.Select(d => new Val(d))));
+
+        public static Parser<BinaryElement> BinaryParser =
+           (from node in Node
+            from op in GreaterThanOrEquals.XOr(LessThanOrEquals).XOr(EqualsOp).XOr(LessThan).XOr(GreaterThan)
+            from val in ValParser
+            select new BinaryElement(new NodeElement(node), op, val)).Named("binary");
 
         public static Parser<LogicalGroup> OrGroup = GroupParser(Or);
         public static Parser<LogicalGroup> AndGroup = GroupParser(And);
@@ -159,16 +223,7 @@ namespace FilterParser
 
         //        private static Parser
 
-        public static Parser<string> String = 
-           (from qStart in Parse.Char('"')
-            from str in Parse.CharExcept("\"\r\n").XMany().Text()
-            from qEnd in Parse.Char('"')
-            select str).Token();
-
-        public static Parser<bool> Bool = Parse.IgnoreCase("true").Or(Parse.IgnoreCase("false")).Text().Select(x => x.ToLower() == "true");
-
-        public static Parser<decimal> Decimal = Parse.DecimalInvariant.Select(s => decimal.Parse(s.Replace(',','.'), NumberStyles.Any, NumberFormatInfo.InvariantInfo));
-
+        
 
     }
 }

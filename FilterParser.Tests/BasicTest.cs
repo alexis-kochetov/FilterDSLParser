@@ -56,7 +56,7 @@ Aasd.ASDDD098.[asedsdf sdfsd 0909] = 123");
 
             Assert.Equal(FilterGrammar.Operator.Equals, binaryElement.Operator);
             Assert.Equal("Aasd.ASDDD098.asedsdf sdfsd 0909", binaryElement.Left.Name);
-            Assert.Equal(123m, binaryElement.Value);
+            Assert.Equal(123m, binaryElement.Value.DecimalValue);
         }
 
         [Fact]
@@ -67,8 +67,8 @@ Aasd.ASDDD098.[asedsdf sdfsd 0909] = 123");
             
             Assert.Equal(FilterGrammar.LogicalOperator.Or, group.LogicalOperator);
             Assert.Equal(2, binaryElements.Count);
-            Assert.Equal("asa asa", binaryElements.First().Value);
-            Assert.Equal(1234.4m, binaryElements.ElementAt(1).Value);
+            Assert.Equal("asa asa", binaryElements.First().Value.StringValue);
+            Assert.Equal(1234.4m, binaryElements.ElementAt(1).Value.DecimalValue);
         }
 
 
@@ -80,7 +80,7 @@ Aasd.ASDDD098.[asedsdf sdfsd 0909] = 123");
 
             Assert.Equal(FilterGrammar.LogicalOperator.Or, group.LogicalOperator);
             Assert.Equal(3, binaryElements.Count);
-            Assert.Equal(true, binaryElements.ElementAt(2).Value);
+            Assert.Equal(true, binaryElements.ElementAt(2).Value.BoolValue);
         }
 
         [Fact]
