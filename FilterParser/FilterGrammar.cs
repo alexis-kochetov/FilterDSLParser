@@ -54,14 +54,14 @@ namespace FilterParser
 
         public class LogicalGroup : Element
         {
-            public LogicalGroup(LogicalOperator @operator, IReadOnlyCollection<BinaryElement> elements)
+            public LogicalGroup(LogicalOperator @operator, IReadOnlyCollection<Element> elements)
             {
                 LogicalOperator = @operator;
                 Elements = elements;
             }
 
             public LogicalOperator LogicalOperator { get; }
-            public IReadOnlyCollection<BinaryElement> Elements { get; }
+            public IReadOnlyCollection<Element> Elements { get; }
         }
 
         public static Parser<string> NodeItem =
@@ -86,10 +86,10 @@ namespace FilterParser
             select firstNode + string.Join(string.Empty, theRest)).Token().Named("node");
 
         public static Parser<BinaryElement> BinaryParser = 
-            from node in Node
+           (from node in Node
             from op in GreaterThanOrEquals.XOr(LessThanOrEquals).XOr(EqualsOp).XOr(LessThan).XOr(GreaterThan)
             from val in String.Select(s => (object)s).XOr(Bool.Select(b => (object)b)).XOr(Decimal.Select(d => (object)d))
-            select new BinaryElement(new NodeElement(node), op, val);
+            select new BinaryElement(new NodeElement(node), op, val)).Named("binary");
 
        
 
@@ -125,19 +125,39 @@ namespace FilterParser
         public static Parser<LogicalGroup> OrGroup = GroupParser(Or);
         public static Parser<LogicalGroup> AndGroup = GroupParser(And);
 
+        public static Parser<LogicalGroup> InnerGroup = 
+           (from lParen in Parse.Char('(')
+            from ls in Parse.WhiteSpace.Many().Optional()
+            from g in AndGroup.Or(OrGroup)
+            from rs in Parse.WhiteSpace.Many().Optional()
+            from rParen in Parse.Char(')')
+            select g).XOr(AndGroup.Or(OrGroup));
+
+        public static Parser<LogicalGroup> Group =
+            from ls in Parse.WhiteSpace.Many().Optional()
+            from g in InnerGroup
+            from rs in Parse.WhiteSpace.Many().Optional()
+            select g;
+
+        public static Parser<LogicalGroup> Filter = Group.End();
+
         private static Parser<LogicalGroup> GroupParser(Parser<LogicalOperator> op)
         {
+            var binOrGroup = BinaryParser.Select(e => (Element)e).XOr(Parse.Ref(() => Group));
+
             return
-                from first in BinaryParser
+                from first in binOrGroup
                 from p in op
-                from second in BinaryParser
+                from second in binOrGroup
                 from theRest in (
                     from pN in op
-                    from n in BinaryParser
+                    from n in binOrGroup
                     select n
                 ).Many()
                 select new LogicalGroup(p, new[] { first, second }.Concat(theRest).ToList());
         }
+
+        //        private static Parser
 
         public static Parser<string> String = 
            (from qStart in Parse.Char('"')

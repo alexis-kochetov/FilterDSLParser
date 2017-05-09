@@ -63,11 +63,12 @@ Aasd.ASDDD098.[asedsdf sdfsd 0909] = 123");
         public void SimpleGroupTest()
         {
             var group = FilterGrammar.OrGroup.Parse(@"Aasd.ASDDD098 = ""asa asa"" OR AsaA >= 1234.4");
-
+            var binaryElements = group.Elements.OfType<FilterGrammar.BinaryElement>().ToList();
+            
             Assert.Equal(FilterGrammar.LogicalOperator.Or, group.LogicalOperator);
-            Assert.Equal(2, group.Elements.Count);
-            Assert.Equal("asa asa", group.Elements.First().Value);
-            Assert.Equal(1234.4m, group.Elements.ElementAt(1).Value);
+            Assert.Equal(2, binaryElements.Count);
+            Assert.Equal("asa asa", binaryElements.First().Value);
+            Assert.Equal(1234.4m, binaryElements.ElementAt(1).Value);
         }
 
 
@@ -75,10 +76,45 @@ Aasd.ASDDD098.[asedsdf sdfsd 0909] = 123");
         public void LongGroupTest()
         {
             var group = FilterGrammar.OrGroup.Parse(@"Aasd.ASDDD098 = ""asa asa"" OR AsaA >= 1234.4 OR Xyz = true");
+            var binaryElements = group.Elements.OfType<FilterGrammar.BinaryElement>().ToList();
 
             Assert.Equal(FilterGrammar.LogicalOperator.Or, group.LogicalOperator);
-            Assert.Equal(3, group.Elements.Count);
-            Assert.Equal(true, group.Elements.ElementAt(2).Value);
+            Assert.Equal(3, binaryElements.Count);
+            Assert.Equal(true, binaryElements.ElementAt(2).Value);
+        }
+
+        [Fact]
+        public void ParenGroupTest()
+        {
+            var group = FilterGrammar.Group.Parse(@"Aasd.ASDDD098 = ""asa asa"" OR ( AsaA >= 1234.4 AND Xyz = true )");
+
+            Assert.Equal(FilterGrammar.LogicalOperator.Or, group.LogicalOperator);
+        }
+
+        [Fact]
+        public void RootParenGroupTest()
+        {
+            var group = FilterGrammar.Group.Parse(@"(Aasd.ASDDD098 = ""asa asa"" AND (AsaA >= 1234.4 OR Xyz = true ))");
+
+            Assert.Equal(FilterGrammar.LogicalOperator.And, group.LogicalOperator);
+        }
+
+        [Fact]
+        public void FilterTest()
+        {
+            var group = FilterGrammar.Filter.Parse(@"
+    
+(
+    Aasd.ASDDD098 = ""asa asa"" 
+    AND 
+    (
+        AsaA >= 1234.4 
+        OR  Xyz = true 
+    )  
+)  
+");
+
+            Assert.Equal(FilterGrammar.LogicalOperator.And, group.LogicalOperator);
         }
     }
 }
