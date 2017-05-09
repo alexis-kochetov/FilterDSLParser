@@ -122,10 +122,12 @@ namespace FilterParser
             from rBracket in Parse.Char(']')
             select firstLetter + theRest;
 
-        public static Parser<string> FunctionItem =
-            from firstLetter in Parse.Letter.Many().Text()
-            from theRest in Parse.LetterOrDigit.Many().Text()
-            select firstLetter + theRest;
+        public static Parser<FunctionElement> FunctionItem =
+           (from name in Parse.Letter.XMany().Text()
+            from lParen in Parse.Char('(')
+            from args in ValParser.DelimitedBy(Parse.Char(',').Token()).Optional()
+            from rParen in Parse.Char(')')
+            select new FunctionElement(name, args.IsDefined ? args.Get().ToList() : new List<Val>())).Token().Named("function");
 
         public static Parser<string> Node =
            (from firstNode in NodeItem
@@ -135,26 +137,6 @@ namespace FilterParser
                 select dot + item
             ).XMany()
             select firstNode + string.Join(string.Empty, theRest)).Token().Named("node");
-
-        //        static readonly Parser<Expression> Factor =
-//            (from lparen in Parse.Char('(')
-//                from expr in Parse.Ref(() => Expr)
-//                from rparen in Parse.Char(')')
-//                select expr).Named("expression")
-//            .XOr(Constant);
-//
-//        static readonly Parser<Expression> Operand =
-//        ((from sign in Parse.Char('-')
-//            from factor in Factor
-//            select Expression.Negate(factor)
-//        ).XOr(Factor)).Token();
-//
-//        static readonly Parser<Expression> Term = Parse.XChainOperator(Multiply.XOr(Divide), Operand, Expression.MakeBinary);
-//
-//        static readonly Parser<Expression> Expr = Parse.XChainOperator(Add.XOr(Subtract), Term, Expression.MakeBinary);
-
-        //        public static Parser<Element> ElementParser = 
-
 
         public static Parser<LogicalOperator> And = Parse.String("AND").Token().Return(LogicalOperator.And);
         public static Parser<LogicalOperator> Or = Parse.String("OR").Token().Return(LogicalOperator.Or);
@@ -180,11 +162,11 @@ namespace FilterParser
                 .XOr(Bool.Select(b => new Val(b))
                 .XOr(Decimal.Select(d => new Val(d))));
 
-        public static Parser<BinaryElement> BinaryParser =
-           (from node in Node
+        public static Parser<BinaryElement> BinaryParser = 
+           (from node in Node.Select(n => new NodeElement(n))//.Or(FunctionItem)
             from op in GreaterThanOrEquals.XOr(LessThanOrEquals).XOr(EqualsOp).XOr(LessThan).XOr(GreaterThan)
             from val in ValParser
-            select new BinaryElement(new NodeElement(node), op, val)).Named("binary");
+            select new BinaryElement(node, op, val)).Named("binary");
 
         public static Parser<LogicalGroup> OrGroup = GroupParser(Or);
         public static Parser<LogicalGroup> AndGroup = GroupParser(And);

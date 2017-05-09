@@ -49,6 +49,25 @@ namespace FilterParser.Tests
         }
 
         [Fact]
+        public void FunctionTest()
+        {
+            var node = FilterGrammar.FunctionItem.Parse("SimpleFun(\"arg1\")");
+
+            Assert.Equal("SimpleFun", node.Name);
+            Assert.Equal(1, node.Arguments.Count);
+            Assert.Equal("arg1", node.Arguments[0].StringValue);
+        }
+
+        [Fact]
+        public void EmptyFunctionTest()
+        {
+            var node = FilterGrammar.FunctionItem.Parse("SimpleFun()");
+
+            Assert.Equal("SimpleFun", node.Name);
+            Assert.Equal(0, node.Arguments.Count);
+        }
+
+        [Fact]
         public void BinaryTest()
         {
             var binaryElement = FilterGrammar.BinaryParser.Parse(@"
